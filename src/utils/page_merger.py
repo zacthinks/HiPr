@@ -44,7 +44,7 @@ def get_max_match(text, loc, delim, window=100, threshold=3):
 
 def crude_headerfooter_matcher(
         text, loc, delim, window=100, min_len=3,
-        left_p=re.compile(r"\b(?![^\w\s])[^a-z]*$"),
+        left_p=re.compile(r"\b(?=[A-Z0-9])[^a-z]*$"),
         right_p=re.compile(r"^[^a-z]*\b")):
     d_len = len(delim)
     left = text[loc - window:loc]
