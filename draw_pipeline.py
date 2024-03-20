@@ -9,7 +9,7 @@ def main():
         arrow_length = d.unit * 2 / 3
 
         flow.Data().label("Constellate")
-        flow.Arrow().right(arrow_length).label("cleaner.py", fontsize=label_fontsize)
+        flow.Arrow().right(arrow_length).label("wrangler.py", fontsize=label_fontsize)
         flow.Box().label("Cleaned docs")
         flow.Arrow().right(arrow_length).label("subsetter.py", fontsize=label_fontsize)
         flow.Box().label("Subsetted docs")

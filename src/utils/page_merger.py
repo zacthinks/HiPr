@@ -1,20 +1,26 @@
 import re
 
 
-def get_max_match(text, loc, delim, window=100, threshold=3):
+def get_max_match(text, loc, delim, window=100, threshold=3, maxnum=3):
     left = text[max(0, loc - window):loc]
     right = text[loc + len(delim):loc + len(delim) + window]
     left_str = r"\s*"
     right_str = r"\s*"
     match_count = 0
 
+    num_count = 0
     while True:
-        next_block = re.search(r"(\S+)" + left_str + "$", left).group(1)
+        if next_match := re.search(r"(\S+)" + left_str + "$", left):
+            next_block = next_match.group(1)
+        else:
+            break
         if next_block.isdigit():
+            num_count += 1
+            if num_count > maxnum:
+                break
             new_left_str = r"\s*\d+" + left_str
         else:
             new_left_str = r"\s*" + re.escape(next_block) + left_str
-
         new_match_count = len(re.findall(new_left_str + delim, text, re.IGNORECASE))
         if new_match_count >= threshold:
             left_str = new_left_str
@@ -22,9 +28,16 @@ def get_max_match(text, loc, delim, window=100, threshold=3):
         else:
             break
 
+    num_count = 0
     while True:
-        next_block = re.search("^" + right_str + r"(\S+)", right).group(1)
+        if next_match := re.search("^" + right_str + r"(\S+)", right):
+            next_block = next_match.group(1)
+        else:
+            break
         if next_block.isdigit():
+            num_count += 1
+            if num_count > maxnum:
+                break
             new_right_str = right_str + r"\d+\s*"
         else:
             new_right_str = right_str + re.escape(next_block) + r"\s*"
@@ -53,7 +66,10 @@ def crude_headerfooter_matcher(
         left_len = len(left_match.group())
     else:
         left_len = 0
-    right_len = len(right_p.search(right).group())
+    if right_match := right_p.search(right):
+        right_len = len(right_match.group())
+    else:
+        right_len = 0
 
     if left_len < min_len:
         left_len = 0
@@ -93,7 +109,13 @@ def join_pages(pages,
         if max_match := get_max_match(joined, loc, delim):
             if verbose:
                 print(f"{max_match[1]} matches ({max_match[1] / n_delim:.2%}) found by get_max_match to be deleted:")
-            joined = max_match[0].sub(repl_func, joined)
+            joined_new = max_match[0].sub(repl_func, joined)
+            if joined_new == joined:
+                print("ERROR in get_max_match--pattern not matching.")
+                print(joined, loc, delim, max_match[0])
+                joined = joined[:loc] + " " + joined[loc + len(delim):]
+            else:
+                joined = joined_new
         elif use_crude and (crude_match := crude_headerfooter_matcher(joined, loc, delim)):
             if verbose:
                 print("Crude match to be deleted: ", joined[crude_match[0]:crude_match[1]])
