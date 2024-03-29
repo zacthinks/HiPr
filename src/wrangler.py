@@ -206,7 +206,7 @@ def parse_args():
                         help="language score threshold for including a document in cleaned dataset (default: .8)")
     parser.add_argument('-random_sample', '-r', nargs='?', type=float, default=1,
                         help="probability of including document in sample (default: 1)")
-    parser.add_argument('-random_seed', '-s', nargs='?', type=float, default=0,
+    parser.add_argument('-random_seed', '-s', nargs='?', type=int, default=0,
                         help="seed for random sampling (default: 0)")
     parser.add_argument('-batch_size', nargs='?', type=int, default=10000,
                         help="maximum number of documents per file in cleaned dataset, only applies if data is processed "
