@@ -59,9 +59,9 @@ def main():
             id_list = []
             fulltext_list = []
             with gzip.open(data_loc, 'rt') as f:
-                if np.random.rand() > args.random_sample:
-                    continue
                 for line in tqdm(f, desc='Reading lines', total=100000):
+                    if np.random.rand() > args.random_sample:
+                        continue
                     original_len += 1
                     data = json.loads(line)
                     if not pc.is_in(data['isPartOf'], journals_tbl['journal']).as_py():

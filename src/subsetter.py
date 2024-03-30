@@ -54,7 +54,7 @@ def main():
         if args.count_only:
             continue
 
-        table = table.filter(mask).to_pandas()
+        table = table.filter(mask).to_pandas().sample(frac=args.random_sample)
         table['extract'] = table[args.text_field].apply(get_windows)
         if args.text_field != 'extract':
             table = table.drop(columns=args.text_field)
