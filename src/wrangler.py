@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import argparse
 from glob import glob
 from tqdm import tqdm
@@ -16,6 +17,7 @@ import fasttext
 from utils.page_merger import join_pages
 from utils.lang_checker import lang_checker
 from utils.cleaner import cleaner
+# include doc lengths
 
 
 def main():
@@ -23,12 +25,8 @@ def main():
     np.random.seed(args.random_seed)
 
     # Check for save location
-    isExist = os.path.exists(args.save_location)
-    if not isExist:
-        os.makedirs(args.save_location)
-        print(f"New directory {args.save_location} created.")
-    else:
-        print(f"Save directory {args.save_location} exists.")
+    save_loc = Path(args.save_location)
+    save_loc.mkdir(parents=True, exist_ok=True)
 
     # Find jsonl.gz files
     data_locs = glob(args.data_location)
@@ -81,21 +79,21 @@ def main():
                         fulltext_list.append(cleaner(fulltext))
                     if len(metadata_list) == args.batch_size:
                         table = pa.Table.from_pylist(metadata_list)
-                        pq.write_to_dataset(table, args.save_location + '/metadata')
+                        pq.write_to_dataset(table, save_loc / 'metadata')
                         table = pa.Table.from_pydict({
                             'id': id_list,
                             'fulltext': fulltext_list})
-                        pq.write_to_dataset(table, args.save_location + '/fulltext')
+                        pq.write_to_dataset(table, save_loc / 'fulltext')
                         metadata_list = []
                         id_list = []
                         fulltext_list = []
                 if len(metadata_list) > 0:
                     table = pa.Table.from_pylist(metadata_list)
-                    pq.write_to_dataset(table, args.save_location + '/metadata')
+                    pq.write_to_dataset(table, save_loc / 'metadata')
                     table = pa.Table.from_pydict({
                         'id': id_list,
                         'fulltext': fulltext_list})
-                    pq.write_to_dataset(table, args.save_location + '/fulltext')
+                    pq.write_to_dataset(table, save_loc / 'fulltext')
 
             print(f"Saved {count} documents out of {original_len} read documents from {data_loc}.")
 
@@ -148,7 +146,7 @@ def main():
             # save metadata to file along with new language data
             colnames = table.column_names
             colnames.remove('fullText')
-            pq.write_to_dataset(table.select(colnames), args.save_location + '/metadata')
+            pq.write_to_dataset(table.select(colnames), save_loc / 'metadata')
 
             # restrict table and fulltexts to appropriate language, update ids set
             mask_lang = pc.equal(table['top_lang'], args.language)
@@ -173,7 +171,7 @@ def main():
             table = pa.Table.from_pydict({
                 'id': table['id'],
                 'fulltext': fulltexts})
-            pq.write_to_dataset(table, args.save_location + '/fulltext')
+            pq.write_to_dataset(table, save_loc / 'fulltext')
 
             print(f"Saved {len(table)} documents out of {original_len} read documents from {data_loc}.")
 
