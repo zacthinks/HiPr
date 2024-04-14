@@ -1,22 +1,13 @@
 import argparse
 from glob import glob
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 import re
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.compute as pc
-
-
-def interval_merger(raws):
-    intervals = [raws[0]]
-    for raw in raws[1:]:
-        if intervals[-1][1] > raw[0]:
-            intervals[-1] = (intervals[-1][0], raw[1])
-        else:
-            intervals.append(raw)
-    return intervals
 
 
 def main():
@@ -26,6 +17,7 @@ def main():
     pattern = re.compile(args.pattern, 0 if args.case_sensitive else re.IGNORECASE)
 
     def get_windows(text):
+        # text_len = len(text)
         raws = [(max(0, match.start() - args.window), match.end() + args.window)
                 for match in pattern.finditer(text)]
         intervals = [raws[0]]
@@ -35,7 +27,7 @@ def main():
             else:
                 intervals.append(raw)
 
-        return [text[interval[0]:interval[1]] for interval in intervals]
+        return [(text[interval[0]:interval[1]], interval[0]) for interval in intervals]
 
     data_locs = glob(args.data_location + "/*.parquet")
 
@@ -54,11 +46,16 @@ def main():
         if args.count_only:
             continue
 
-        table = table.filter(mask).to_pandas().sample(frac=args.random_sample)
-        table['extract'] = table[args.text_field].apply(get_windows)
-        if args.text_field != 'extract':
+        table = (table
+                 .filter(mask)
+                 .to_pandas()
+                 .sample(frac=args.random_sample))
+        table['extract-loc'] = pd.DataFrame(table[args.text_field].apply(get_windows))
+        if args.text_field != 'extract-loc':
             table = table.drop(columns=args.text_field)
-        table = table.explode('extract')
+        table = table.explode('extract-loc').reset_index(drop=True)
+        table[['extract', 'loc']] = pd.DataFrame(table['extract-loc'].to_list())
+        table = table.drop(columns='extract-loc')
         table['extract_id'] = table.groupby(args.id_field).cumcount()
         table = pa.Table.from_pandas(table, preserve_index=False)
         pq.write_to_dataset(table, args.save_location + '/extracts')
@@ -73,7 +70,7 @@ def parse_args():
         prog="subsetter",
         description="Creates a limited dataset using a regex expression.")
     parser.add_argument('data_location', type=str,
-                        help="folder containing parquet dataset     ")
+                        help="folder containing parquet dataset")
     parser.add_argument('save_location', type=str,
                         help="folder location to save outputs")
     parser.add_argument('pattern', type=str,
