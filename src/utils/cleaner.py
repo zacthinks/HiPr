@@ -6,9 +6,10 @@ def cleaner(text,
             simpleurl_p=re.compile(r'\S*\.[a-zA-Z]{2,6}/\S*'),
             dash_p=re.compile('([a-zA-Z]{2,})- (a|the) '),
             hyphen_p=re.compile('([a-zA-Z]{2,})- ([a-zA-Z]{2,})'),
-            footnote_p=re.compile(r'([a-zA-Z]{2,}[.,;?"])(\[?\d+\]?)'),
+            footnote_p=re.compile(r'([a-zA-Z]{2,}[.,;?!"\']"?)(\[?\d+\]?)'),
             slashspace_p=re.compile(r'([a-zA-Z]+/) ([a-zA-Z]+)'),
-            numseries_p=re.compile(r'(\d+ \d+)(\s+\d+)+ (\d+ \d+)')
+            numseries_p=re.compile(r'(\d+ \d+)(\s+\d+)+ (\d+ \d+)'),
+            ellipses_p=re.compile(r'.(\s+.)+'),
             ):
     def repl_func(match, repl, pattern, supress_verbose=False):
         result = match.expand(repl)
@@ -20,6 +21,7 @@ def cleaner(text,
     text = dash_p.sub(lambda m: repl_func(m, r'\1 - a ', 'dash_spacer'), text)
     text = footnote_p.sub(lambda m: repl_func(m, r'\1', 'footnote_num_remover'), text)
     text = slashspace_p.sub(lambda m: repl_func(m, r'\1\2', 'slashspace_remover'), text)
-    text = numseries_p.sub(lambda m: repl_func(m, r'\1 ...<NUMBERS>... \2', 'num_series_truncator'), text)
+    text = numseries_p.sub(lambda m: repl_func(m, r'\1 <NUMBERS> \2', 'num_series_truncator'), text)
+    text = ellipses_p.sub(lambda m: repl_func(m, r'...', 'ellipses_fixer'), text)
 
     return text
