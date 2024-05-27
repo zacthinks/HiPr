@@ -8,7 +8,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from allennlp_models import pretrained
-import spacy
 
 
 def main():
