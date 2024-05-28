@@ -100,78 +100,97 @@ def main():
 
     nlp = spacy.load('en_core_web_trf')
 
-    mismatches = pd.DataFrame(columns=args.id_fields + ['srl', 'spacy'])
-    failed_verbs = pd.DataFrame(columns=args.id_fields + ['verb_id', 'failure_position'])
-    srl_roles = pd.DataFrame(columns=(args.id_fields + ['verb_id',
-                                                        'role', 'c_head', 'start', 'end',
-                                                        'ent_type', 'pos', 'word', 'lemma', 'child_dict']))
+    tokens_info_ids = []
+    tokens_info_lemmas = []
+    tokens_info_poss = []
+    mismatches_ids = []
+    mismatches_srl = []
+    mismatches_spacy = []
+    failed_verbs_ids = []
+    failed_verbs_verb_id = []
+    failed_verbs_failure_position = []
+    roles_ids = []
+    roles_verb_id = []
+    roles_role = []
+    roles_c_head = []
+    roles_start = []
+    roles_end = []
+    roles_ent_type = []
+    roles_child_dict = []
+
     extra_space_pat = re.compile(" +")
 
     def process_sentences(row):
         doc = nlp(extra_space_pat.sub(" ", row['sentence']))
-        #spacy_indices = [tok.i for tok in doc if tok.text.strip() != ""]
-        #spacy_chunk = "+-+".join([doc[i].text for i in spacy_indices])
+
+        tokens_info_ids.append(row[args.id_fields].to_list())
+        tokens_info_lemmas.append([tok.lemma_ for tok in doc])
+        tokens_info_poss.append([tok.pos_ for tok in doc])
+
         spacy_chunk = "+-+".join([tok.text for tok in doc])
         srl_chunk = "+-+".join(row['srl_toks'])
 
         if spacy_chunk != srl_chunk:
-            mismatch_row = row[args.id_fields]
-            mismatch_row['srl'] = srl_chunk
-            mismatch_row['spacy'] = spacy_chunk
-            mismatches.loc[len(mismatches)] = mismatch_row
-            print(f"Mismatch found. Total: {len(mismatches)}")
+            mismatches_ids.append(row[args.id_fields].to_list())
+            mismatches_srl.append(srl_chunk)
+            mismatches_spacy.append(spacy_chunk)
+            print(f"Mismatch found. Total: {len(mismatches_ids)}")
             return
 
         verbs = row[args.id_fields].to_frame().T.merge(srl_verbs)
 
-        for i, row in verbs.iterrows():
+        for verbrow in verbs.itertuples(index=False):
+            id_is = [i for i, field in enumerate(verbrow._fields) if field in args.id_fields]
             try:
-                roles_pos = get_roles_pos(row['tags'])
+                roles_pos = get_roles_pos(verbrow.tags)
             except InvalidIOB as e:
                 roles_pos = []
-                failed_row = row[args.id_fields]
-                failed_row['verb_id'] = row['verb_id']
-                failed_row['failure_position'] = e.position
-                failed_verbs.loc[len(failed_verbs)] = failed_row
+                failed_verbs_ids.append([verbrow[i] for i in id_is])
+                failed_verbs_verb_id.append(verbrow.verb_id)
+                failed_verbs_failure_position.append(e.position)
 
             for role, start, end in roles_pos:
                 range_heads = get_range_head(
                     doc, start, end, role != 'V')
                 for c_head, ent_type, pos, child_dict in range_heads:
-                    role_row = row[args.id_fields]
-                    role_row['verb_id'] = row['verb_id']
-                    role_row['role'] = role
-                    try:
-                        role_row['c_head'] = c_head
-                    except ValueError:
-                        print("ValueError")
-                        print(start, end, c_head, pos, doc[c_head].text, doc)
-                    role_row['start'] = start
-                    role_row['end'] = end
-                    role_row['ent_type'] = ent_type
-                    role_row['pos'] = pos
-                    role_row['word'] = doc[c_head].text
-                    role_row['lemma'] = doc[c_head].lemma_
-                    role_row['child_dict'] = child_dict
-
-                    srl_roles.loc[len(srl_roles)] = role_row
+                    roles_ids.append([verbrow[i] for i in id_is])
+                    roles_verb_id.append(verbrow.verb_id)
+                    roles_role.append(role)
+                    roles_c_head.append(c_head)
+                    roles_start.append(start)
+                    roles_end.append(end)
+                    roles_ent_type.append(ent_type)
+                    roles_child_dict.append(child_dict)
 
     tqdm.pandas(desc='Parsing and labeling SRL output sentences...')
     srl_toks.progress_apply(process_sentences, axis=1)
 
-    pq.write_to_dataset(pa.Table.from_pandas(srl_roles), save_loc / 'roles')
-    pq.write_to_dataset(pa.Table.from_pandas(mismatches), save_loc / 'parse_mismatches')
-    pq.write_to_dataset(pa.Table.from_pandas(failed_verbs), save_loc / 'failed_srl')
+    pq.write_to_dataset(pa.table(list(zip(*tokens_info_ids)) + [tokens_info_lemmas, tokens_info_poss],
+                                 names=args.id_fields + ['lemmas', 'poss']),
+                        save_loc / 'tokens_info')
+    if len(mismatches_ids) > 0:
+        pq.write_to_dataset(pa.table(list(zip(*mismatches_ids)) + [mismatches_srl, mismatches_spacy],
+                                     names=args.id_fields + ['srl', 'spacy']),
+                            save_loc / 'parse_mismatches')
+    if len(failed_verbs_ids) > 0:
+        pq.write_to_dataset(pa.table(list(zip(*failed_verbs_ids)) + [failed_verbs_verb_id, failed_verbs_failure_position],
+                                     names=args.id_fields + ['verb_id', 'failure_position']),
+                            save_loc / 'failed_srl')
+    pq.write_to_dataset(pa.table(list(zip(*roles_ids)) + [roles_verb_id, roles_role, roles_c_head,
+                                                          roles_start, roles_end, roles_ent_type, roles_child_dict],
+                                 names=args.id_fields + ['verb_id', 'role', 'c_head',
+                                                         'start', 'end', 'ent_type', 'child_dict']),
+                        save_loc / 'roles')
 
-    ndocs = len(srl_toks) - len(mismatches)
-    print(f"Found {len(srl_roles)} role{'s' if len(srl_roles) != 1 else ''} "
+    ndocs = len(srl_toks) - len(mismatches_ids)
+    print(f"Found {len(roles_ids)} role{'s' if len(roles_ids) != 1 else ''} "
           f"across {ndocs} sentence{'s' if ndocs != 1 else ''} "
-          f"(mean of {len(srl_roles) / ndocs if ndocs > 0 else 0:.2f} per sentence).")
-    print(f"Excluded {len(mismatches)} sentence{'s' if len(mismatches) != 1 else ''} "
-          f"({len(mismatches) / len(srl_toks) if len(srl_toks) > 0 else 0:.2%}) "
+          f"(mean of {len(roles_ids) / ndocs if ndocs > 0 else 0:.2f} per sentence).")
+    print(f"Excluded {len(mismatches_ids)} sentence{'s' if len(mismatches_ids) != 1 else ''} "
+          f"({len(mismatches_ids) / len(srl_toks) if len(srl_toks) > 0 else 0:.2%}) "
           f"due to mismatch between SRL and spaCy tokenizers.")
-    print(f"Excluded {len(failed_verbs)} verb{'s' if len(failed_verbs) != 1 else ''} "
-          f"({len(failed_verbs) / len(srl_verbs) if len(srl_verbs) > 0 else 0:.2%}) "
+    print(f"Excluded {len(failed_verbs_ids)} verb{'s' if len(failed_verbs_ids) != 1 else ''} "
+          f"({len(failed_verbs_ids) / len(srl_verbs) if len(srl_verbs) > 0 else 0:.2%}) "
           f"due to invalid SRL parses.")
 
 
