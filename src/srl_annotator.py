@@ -30,7 +30,7 @@ def get_child_dict(tok):
     return child_dict
 
 
-def get_range_head(doc, start, end, return_conjs):
+def get_range_head(doc, start, end, return_conjs=True):
     head_i = start
     while (doc[head_i].head.i > start
            and doc[head_i].head.i <= end
@@ -44,10 +44,10 @@ def get_range_head(doc, start, end, return_conjs):
                 break
 
     if return_conjs:
-        return ([(c.i, c.ent_type_, c.pos_, get_child_dict(c)) for c in doc[head_i].conjuncts]
-                + [(head_i, doc[head_i].ent_type_, doc[head_i].pos_, get_child_dict(doc[head_i]))])
+        return ([(c.i, c.text, c.ent_type_, get_child_dict(c)) for c in doc[head_i].conjuncts]
+                + [(head_i, doc[head_i].text, doc[head_i].ent_type_, get_child_dict(doc[head_i]))])
     else:
-        return [(head_i, doc[head_i].ent_type_, doc[head_i].pos_, get_child_dict(doc[head_i]))]
+        return [(head_i, doc[head_i].text, doc[head_i].ent_type_, get_child_dict(doc[head_i]))]
 
 
 def get_roles_pos(tags):
@@ -110,13 +110,14 @@ def main():
     failed_verbs_verb_id = []
     failed_verbs_failure_position = []
     roles_ids = []
-    roles_verb_id = []
-    roles_role = []
-    roles_c_head = []
-    roles_start = []
-    roles_end = []
-    roles_ent_type = []
-    roles_child_dict = []
+    roles_verb_ids = []
+    roles_roles = []
+    roles_c_heads = []
+    roles_words = []
+    roles_starts = []
+    roles_ends = []
+    roles_ent_types = []
+    roles_child_dicts = []
 
     extra_space_pat = re.compile(" +")
 
@@ -139,28 +140,28 @@ def main():
 
         verbs = row[args.id_fields].to_frame().T.merge(srl_verbs)
 
-        for verbrow in verbs.itertuples(index=False):
-            id_is = [i for i, field in enumerate(verbrow._fields) if field in args.id_fields]
+        for verb_row in verbs.itertuples(index=False):
+            id_is = [i for i, field in enumerate(verb_row._fields) if field in args.id_fields]
             try:
-                roles_pos = get_roles_pos(verbrow.tags)
+                roles_pos = get_roles_pos(verb_row.tags)
             except InvalidIOB as e:
                 roles_pos = []
-                failed_verbs_ids.append([verbrow[i] for i in id_is])
-                failed_verbs_verb_id.append(verbrow.verb_id)
+                failed_verbs_ids.append([verb_row[i] for i in id_is])
+                failed_verbs_verb_id.append(verb_row.verb_id)
                 failed_verbs_failure_position.append(e.position)
 
             for role, start, end in roles_pos:
-                range_heads = get_range_head(
-                    doc, start, end, role != 'V')
-                for c_head, ent_type, pos, child_dict in range_heads:
-                    roles_ids.append([verbrow[i] for i in id_is])
-                    roles_verb_id.append(verbrow.verb_id)
-                    roles_role.append(role)
-                    roles_c_head.append(c_head)
-                    roles_start.append(start)
-                    roles_end.append(end)
-                    roles_ent_type.append(ent_type)
-                    roles_child_dict.append(child_dict)
+                range_heads = get_range_head(doc, start, end, role != 'V')
+                for c_head, word, ent_type, child_dict in range_heads:
+                    roles_ids.append([verb_row[i] for i in id_is])
+                    roles_verb_ids.append(verb_row.verb_id)
+                    roles_roles.append(role)
+                    roles_c_heads.append(c_head)
+                    roles_words.append(word)
+                    roles_starts.append(start)
+                    roles_ends.append(end)
+                    roles_ent_types.append(ent_type)
+                    roles_child_dicts.append(child_dict)
 
     tqdm.pandas(desc='Parsing and labeling SRL output sentences...')
     srl_toks.progress_apply(process_sentences, axis=1)
@@ -176,9 +177,9 @@ def main():
         pq.write_to_dataset(pa.table(list(zip(*failed_verbs_ids)) + [failed_verbs_verb_id, failed_verbs_failure_position],
                                      names=args.id_fields + ['verb_id', 'failure_position']),
                             save_loc / 'failed_srl')
-    pq.write_to_dataset(pa.table(list(zip(*roles_ids)) + [roles_verb_id, roles_role, roles_c_head,
-                                                          roles_start, roles_end, roles_ent_type, roles_child_dict],
-                                 names=args.id_fields + ['verb_id', 'role', 'c_head',
+    pq.write_to_dataset(pa.table(list(zip(*roles_ids)) + [roles_verb_ids, roles_roles, roles_c_heads, roles_words,
+                                                          roles_starts, roles_ends, roles_ent_types, roles_child_dicts],
+                                 names=args.id_fields + ['verb_id', 'role', 'c_head', 'word',
                                                          'start', 'end', 'ent_type', 'child_dict']),
                         save_loc / 'roles')
 
@@ -202,7 +203,7 @@ def parse_args():
                         help="folder containing parquet dataset with sentence and SRL data")
     parser.add_argument('save_location', type=str, nargs='?',
                         help="folder location to save outputs (default: in the parent of data_location)")
-    parser.add_argument('-id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
+    parser.add_argument('--id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
                         help="name(s) of field in parquet dataset that contains the sentence ids "
                              "(default: ['id', 'extract_id', 'sentence_id'])")
 
