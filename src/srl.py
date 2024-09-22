@@ -38,10 +38,14 @@ def main():
             return
 
     def srl_info(row):
-        srl = predictor.predict(row[args.text_field])
-
-        row['srl_toks'] = srl['words']
-        row['srl_verbs'] = srl['verbs']
+        try:
+            srl = predictor.predict(row[args.text_field])
+            row['srl_toks'] = srl['words']
+            row['srl_verbs'] = srl['verbs']
+        except Exception as e:
+            print(f'Failed to parse ({e}): {row[args.text_field]}')
+            row['srl_toks'] = []
+            row['srl_verbs'] = []
 
         return row
 
@@ -53,7 +57,7 @@ def main():
     table = texts[args.id_fields].copy()
     table['verb_dict'] = texts.pop("srl_verbs")
     table = table.explode('verb_dict').reset_index(drop=True)
-    table['verb_id'] = table.groupby(['id', 'extract_id', 'sentence_id']).cumcount()
+    table['verb_id'] = table.groupby(args.id_fields).cumcount()
 
     def verb_expander(row):
         d = row['verb_dict']

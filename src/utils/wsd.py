@@ -31,6 +31,7 @@ def main():
 
     tokens = pd.read_parquet(data_loc / 'tokens').merge(pd.read_parquet(data_loc / 'tokens_info'))
     roles = pd.read_parquet(data_loc / 'roles')
+
     if not args.keep_rc:
         roles = roles[roles.role.str[0].isin(['A', 'V'])]
     if args.verb_filter_pattern:
@@ -46,13 +47,12 @@ def main():
     def head_wsd(row):
         nonlocal oov_count
 
+        forced_pos = 'v' if row['role'] == 'V' else None
         label, d, conf = consec.wordnet_consec(mt, target_position=row['c_head'], tokens=row['srl_toks'],
-                                               poss=row['poss'], lemmas=row['lemmas'], use_lemmas=True,
+                                               poss=row['poss'], forced_pos=forced_pos, lemmas=row['lemmas'],
+                                               use_lemmas=True, use_both=True,
                                                wn_extension=wn_extension, full_consec=False)
         # todo: find way to include full consec--currently including all context definitions results in exceeding token limit (1024)
-        # label_f, d_f, conf_f = consec.wordnet_consec(mt, target_position=row['c_head'], tokens=row['srl_toks'],
-        #                                              poss=row['poss'], lemmas=row['lemmas'], use_lemmas=True,
-        #                                              wn_extension=wn_extension, full_consec=True)
 
         if label[:3] == 'OOV':
             oov_count += 1
@@ -94,10 +94,10 @@ def parse_args():
     parser.add_argument('--wordnet_extension_location', '-x', type=str, nargs='?',
                         help="location wordnet extensions)")
     parser.add_argument('--verb_filter_pattern', '-f', type=str, nargs='?',
-                        help="regex pattern used to filter verbs")
+                        help="regex pattern used to filter verbs to only those that contain at least one role that matches the pattern")
     parser.add_argument('--keep_rc', '-k', action='store_true',
                         help="keep R- and C- roles, which are discarded by default")
-    parser.add_argument('--id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
+    parser.add_argument('--id_fields', '-i', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
                         help="name(s) of field in parquet dataset that contains the sentence ids "
                              "(default: ['id', 'extract_id', 'sentence_id'])")
     parser.add_argument('--cuda_device', '-c', nargs='?', type=int, default=0,

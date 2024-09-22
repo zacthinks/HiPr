@@ -43,11 +43,17 @@ def get_range_head(doc, start, end, return_conjs=True):
                 head_i = child.i
                 break
 
+    quantifiers = ['all', 'some', 'more', 'lot', 'lots', 'enough', 'none', 'any', 'most', 'less', 'much']
+    if (doc[head_i].text.lower() in quantifiers) and ('of' in [c.text.lower() for c in doc[head_i].children]):
+        of_tok = next(c for c in doc[head_i].children if c.text.lower() == 'of')
+        head_i = next((c.i for c in of_tok.children if c.dep_ == 'pobj'), head_i)
+
+    head_info = [(head_i, doc[head_i].text, doc[head_i].lemma_, doc[head_i].ent_type_, get_child_dict(doc[head_i]))]
     if return_conjs:
-        return ([(c.i, c.text, c.ent_type_, get_child_dict(c)) for c in doc[head_i].conjuncts]
-                + [(head_i, doc[head_i].text, doc[head_i].ent_type_, get_child_dict(doc[head_i]))])
+        return ([(c.i, c.text, c.lemma_, c.ent_type_, get_child_dict(c)) for c in doc[head_i].conjuncts]
+                + head_info)
     else:
-        return [(head_i, doc[head_i].text, doc[head_i].ent_type_, get_child_dict(doc[head_i]))]
+        return head_info
 
 
 def get_roles_pos(tags):
@@ -114,6 +120,7 @@ def main():
     roles_roles = []
     roles_c_heads = []
     roles_words = []
+    roles_lemmas = []
     roles_starts = []
     roles_ends = []
     roles_ent_types = []
@@ -135,7 +142,7 @@ def main():
             mismatches_ids.append(row[args.id_fields].to_list())
             mismatches_srl.append(srl_chunk)
             mismatches_spacy.append(spacy_chunk)
-            print(f"Mismatch found. Total: {len(mismatches_ids)}")
+            # print(f"Mismatch found. Total: {len(mismatches_ids)}")
             return
 
         verbs = row[args.id_fields].to_frame().T.merge(srl_verbs)
@@ -152,12 +159,13 @@ def main():
 
             for role, start, end in roles_pos:
                 range_heads = get_range_head(doc, start, end, role != 'V')
-                for c_head, word, ent_type, child_dict in range_heads:
+                for c_head, word, lemma, ent_type, child_dict in range_heads:
                     roles_ids.append([verb_row[i] for i in id_is])
                     roles_verb_ids.append(verb_row.verb_id)
                     roles_roles.append(role)
                     roles_c_heads.append(c_head)
                     roles_words.append(word)
+                    roles_lemmas.append(lemma)
                     roles_starts.append(start)
                     roles_ends.append(end)
                     roles_ent_types.append(ent_type)
@@ -177,9 +185,9 @@ def main():
         pq.write_to_dataset(pa.table(list(zip(*failed_verbs_ids)) + [failed_verbs_verb_id, failed_verbs_failure_position],
                                      names=args.id_fields + ['verb_id', 'failure_position']),
                             save_loc / 'failed_srl')
-    pq.write_to_dataset(pa.table(list(zip(*roles_ids)) + [roles_verb_ids, roles_roles, roles_c_heads, roles_words,
+    pq.write_to_dataset(pa.table(list(zip(*roles_ids)) + [roles_verb_ids, roles_roles, roles_c_heads, roles_words, roles_lemmas,
                                                           roles_starts, roles_ends, roles_ent_types, roles_child_dicts],
-                                 names=args.id_fields + ['verb_id', 'role', 'c_head', 'word',
+                                 names=args.id_fields + ['verb_id', 'role', 'c_head', 'word', 'lemma',
                                                          'start', 'end', 'ent_type', 'child_dict']),
                         save_loc / 'roles')
 
@@ -203,7 +211,7 @@ def parse_args():
                         help="folder containing parquet dataset with sentence and SRL data")
     parser.add_argument('save_location', type=str, nargs='?',
                         help="folder location to save outputs (default: in the parent of data_location)")
-    parser.add_argument('--id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
+    parser.add_argument('-id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
                         help="name(s) of field in parquet dataset that contains the sentence ids "
                              "(default: ['id', 'extract_id', 'sentence_id'])")
 

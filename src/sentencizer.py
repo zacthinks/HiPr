@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 import re
 
@@ -12,6 +13,7 @@ import spacy
 
 def main():
     args = parse_args()
+    np.random.seed(args.random_seed)
 
     if args.save_location:
         save_loc = Path(args.save_location)
@@ -20,7 +22,8 @@ def main():
     save_loc.mkdir(parents=True, exist_ok=True)
 
     colnames = args.id_fields + ([args.loc_field] if args.loc_field != '' else []) + [args.text_field]
-    texts = pd.read_parquet(args.data_location, columns=colnames)
+    texts = pd.read_parquet(args.data_location, columns=colnames).sample(frac=args.random_sample)
+
     if args.loc_field == '':
         args.loc_field = 'loc'
         texts['loc'] = 0
@@ -28,7 +31,14 @@ def main():
     if args.mask_location:
         texts = texts[pd.read_pickle(args.mask_location)]
 
-    pattern = re.compile(args.pattern, 0 if args.case_sensitive else re.IGNORECASE)
+    if args.pattern:
+        pattern = re.compile(args.pattern, 0 if args.case_sensitive else re.IGNORECASE)
+
+        def is_match(x):
+            return pattern.search(x)
+    else:
+        def is_match(x):
+            return True
 
     try:
         spacy.require_gpu()
@@ -39,7 +49,7 @@ def main():
 
     def get_sentences(text):
         doc = nlp(text)
-        return [(sent.text, sent.start_char) for sent in doc.sents if pattern.search(sent.text)]
+        return [(sent.text, sent.start_char) for sent in doc.sents if is_match(sent.text)]
 
     tqdm.pandas(desc='Extracting sentences...')
     sentences = texts[args.text_field].progress_apply(get_sentences)
@@ -48,7 +58,7 @@ def main():
     table['sentence'] = sentences
     table = table.explode('sentence').reset_index(drop=True)
     table[['sentence', 'loc_']] = pd.DataFrame(table['sentence'].to_list())
-    table['sentence_id'] = table.groupby(['id', 'extract_id']).cumcount()
+    table['sentence_id'] = table.groupby(args.id_fields).cumcount()
     table[args.loc_field] = table[args.loc_field] + table['loc_']
     table = table.drop('loc_', axis=1)
 
@@ -63,24 +73,28 @@ def parse_args():
     parser = argparse.ArgumentParser(
         prog="sentencizer",
         description="Extracts sentences using a regex expression.")
-    parser.add_argument('pattern', type=str,
-                        help="regex pattern to search for")
     parser.add_argument('data_location', type=str,
                         help="folder containing parquet dataset")
-    parser.add_argument('mask_location', type=str, nargs='?',
-                        help="path to a .pkl file with a selection mask for the loaded data")
-    parser.add_argument('save_location', type=str, nargs='?',
+    parser.add_argument('-save_location', type=str,
                         help="folder location to save outputs (default: in the parent of data_location)")
+    parser.add_argument('-mask_location', type=str,
+                        help="path to a .pkl file with a selection mask for the loaded data")
+    parser.add_argument('-pattern', type=str,
+                        help="regex pattern to search for")
     parser.add_argument('-case_sensitive', action='store_true',
                         help='will not ignore case when searching for regex matches')
     parser.add_argument('-text_field', nargs='?', type=str, default='extract',
                         help="name of field in parquet dataset that contains the document texts (default: 'extract')")
     parser.add_argument('-id_fields', nargs='+', type=str, default=['id', 'extract_id'],
-                        help="name(s) of field in parquet dataset that contains the document ids "
+                        help="name(s) of field in parquet dataset that contains the document ids (space separated)"
                              "(default: ['id', 'extract_id'])")
     parser.add_argument('-loc_field', nargs='?', type=str, default='loc',
                         help="name of field in parquet dataset that contains the document locations, "
-                             "enter empty string if none exists (default: 'loc')")
+                             'enter empty string ("") if none exists (default: "loc")')
+    parser.add_argument('-random_sample', '-r', nargs='?', type=float, default=1,
+                        help="probability of including document in sample (default: 1)")
+    parser.add_argument('-random_seed', '-s', nargs='?', type=int, default=0,
+                        help="seed for random sampling (default: 0)")
 
     return parser.parse_args()
 

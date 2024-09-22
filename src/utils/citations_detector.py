@@ -21,7 +21,7 @@ def main():
     p_densities = p_counts / table[args.text_field].str.len() * 100
 
     if args.simple_threshold:
-        mask = (p_densities <= args.simple_threshold) | (p_counts == 1)
+        mask = (p_densities <= args.simple_threshold) | (p_counts < 2)
     else:
         mins = p_densities.sort_values().unique()
         nonzero_min = mins[1] if mins[0] == 0 else mins[0]
