@@ -92,7 +92,7 @@ def parse_args():
     parser.add_argument('save_location', type=str, nargs='?',
                         help="folder location to save outputs (default: same as data_location)")
     parser.add_argument('--wordnet_extension_location', '-x', type=str, nargs='?',
-                        help="location wordnet extensions)")
+                        help="location of wordnet extensions")
     parser.add_argument('--verb_filter_pattern', '-f', type=str, nargs='?',
                         help="regex pattern used to filter verbs to only those that contain at least one role that matches the pattern")
     parser.add_argument('--keep_rc', '-k', action='store_true',

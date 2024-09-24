@@ -74,8 +74,8 @@ def main():
     pq.write_to_dataset(pa.Table.from_pandas(table), save_loc / 'verbs')
 
     print(f"Found {len(table)} verb{'s' if len(table) != 1 else ''} "
-          f"across {len(texts)} document{'s' if len(texts) != 1 else ''} "
-          f"(mean of {len(table) / len(texts) if len(texts) > 0 else 0:.2f} per document).")
+          f"across {len(texts)} sentence{'s' if len(texts) != 1 else ''} "
+          f"(mean of {len(table) / len(texts) if len(texts) > 0 else 0:.2f} per sentence).")
 
 
 def parse_args():

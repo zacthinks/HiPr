@@ -191,16 +191,16 @@ def main():
                                                          'start', 'end', 'ent_type', 'child_dict']),
                         save_loc / 'roles')
 
-    ndocs = len(srl_toks) - len(mismatches_ids)
-    print(f"Found {len(roles_ids)} role{'s' if len(roles_ids) != 1 else ''} "
-          f"across {ndocs} sentence{'s' if ndocs != 1 else ''} "
-          f"(mean of {len(roles_ids) / ndocs if ndocs > 0 else 0:.2f} per sentence).")
+    nverbs = len(srl_verbs) - len(failed_verbs_ids)
     print(f"Excluded {len(mismatches_ids)} sentence{'s' if len(mismatches_ids) != 1 else ''} "
           f"({len(mismatches_ids) / len(srl_toks) if len(srl_toks) > 0 else 0:.2%}) "
           f"due to mismatch between SRL and spaCy tokenizers.")
     print(f"Excluded {len(failed_verbs_ids)} verb{'s' if len(failed_verbs_ids) != 1 else ''} "
           f"({len(failed_verbs_ids) / len(srl_verbs) if len(srl_verbs) > 0 else 0:.2%}) "
           f"due to invalid SRL parses.")
+    print(f"Annotated {len(roles_ids)} role{'s' if len(roles_ids) != 1 else ''} "
+          f"across {nverbs} verb{'s' if nverbs != 1 else ''} "
+          f"(mean of {len(roles_ids) / nverbs if nverbs > 0 else 0:.2f} per verb).")
 
 
 def parse_args():
@@ -210,7 +210,7 @@ def parse_args():
     parser.add_argument('data_location', type=str,
                         help="folder containing parquet dataset with sentence and SRL data")
     parser.add_argument('save_location', type=str, nargs='?',
-                        help="folder location to save outputs (default: in the parent of data_location)")
+                        help="folder location to save outputs (default: in the srl folder of data_location)")
     parser.add_argument('-id_fields', nargs='+', type=str, default=['id', 'extract_id', 'sentence_id'],
                         help="name(s) of field in parquet dataset that contains the sentence ids "
                              "(default: ['id', 'extract_id', 'sentence_id'])")

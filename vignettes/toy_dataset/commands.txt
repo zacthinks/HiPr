@@ -1,0 +1,11 @@
+cd [ROOT HIPR FOLDER]
+
+(Using environment specified in requirements/srl.txt)
+python src/srl.py vignettes/toy_dataset/sentences -i id
+python src/srl_annotator.py vignettes/toy_dataset -i id
+
+
+(Using environment specified in requirements/wsd.txt)
+set PYTHONPATH=[CONSEC LOCATION]
+python src/wsd.py [CONSEC CHECKPOINT LOCATION] vignettes/toy_dataset/srl -i id -x vignettes/toy_dataset/wn_extension.json
+python src/proposition_identifier.py vignettes/toy_dataset/srl/roles_wn -rcp -i id -x vignettes/toy_dataset/wn_extension.json
