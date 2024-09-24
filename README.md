@@ -9,7 +9,11 @@
 ## Run-through of pipelines
 For the following diagrams, boxes represent data represented in a certain format and arrows represent processing steps (with an accompanying Python script, all of which are in [`src`](src)).
 ### Sentence extraction pipeline
-![A diagram of the sentence extraction pipeline](sentence_pipeline.svg)
+<picture>
+ <source media="(prefers-color-scheme: dark)" srcset="sentence_pipeline_white.svg">
+ <source media="(prefers-color-scheme: light)" srcset="sentence_pipeline.svg">
+ <img alt="A diagram of the sentence extraction pipeline" src="sentence_pipeline.svg">
+</picture>
 For the purposes of our research, we used ITHAKA's [Constellate](https://www.constellate.org/) service to get full-text documents from academic journals (analysis forthcoming). This is the pipeline we used to extract sentences of interest from the raw formats provided by Constellate. If you have your own sentences, you can skip these steps.
 
 1. *Constellate* data is provided in `.jsonl.gz`  files.
@@ -17,7 +21,11 @@ For the purposes of our research, we used ITHAKA's [Constellate](https://www.con
 3. We then extract windows of text around certain terms of interest (TOIs) using `subsetter.py`, giving us *subsetted documents* that are a lot more efficient to process. We also use `citations_detector.py` to flag certain documents as being citations rather than prose, which we exclude from our analysis.
 4. Finally, we use `sentencizer.py` to extract *sentences* from the subsetted documents. While the proposition extraction pipeline doesn't require inputs to be sentences, sentences are a natural unit of analysis (for more discussion, see forthcoming paper).
 ### Proposition extraction pipeline
-![A diagram of the proposition extraction pipeline](processing_pipeline.svg)
+<picture>
+ <source media="(prefers-color-scheme: dark)" srcset="processing_pipeline_white.svg">
+ <source media="(prefers-color-scheme: light)" srcset="processing_pipeline.svg">
+ <img alt="A diagram of the proposition extraction pipeline" src="processing_pipeline.svg">
+</picture>
 Once we have sentences, we can extract HiPr from them. Because each of these steps require more conceptual scaffolding to fully make sense of, we opt instead to provide a toy example for what each step looks like and direct you to our paper for more conceptual explication. The output from each step is also [included in the repository](vignettes\toy_dataset).
 
 1. We start with *sentences* that were extracted with the previous pipeline. 
